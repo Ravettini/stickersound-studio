@@ -1,0 +1,6 @@
+node_modules/
+auth/
+uploads/
+stickers/
+test-tmp/
+.impeccable/

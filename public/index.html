@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StickerSound Studio</title>
+<style>
+  :root { --bg:#0b141a; --card:#111b21; --line:#222e35; --text:#e9edef; --muted:#8696a0; --green:#25d366; --green2:#008069; --red:#f15c6d; }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, "Segoe UI", sans-serif }
+  main { max-width:960px; margin:0 auto; padding:20px; display:grid; gap:16px }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap }
+  h1 { font-size:20px; margin:0 } h1 span { color:var(--green) }
+  h2 { font-size:15px; margin:0 0 12px; color:var(--muted); font-weight:600 }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px }
+  .pill { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:99px; background:var(--line); font-size:13px }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--muted) }
+  .ok .dot { background:var(--green) } .wait .dot { background:#f7c948 }
+  button { background:var(--green2); color:#fff; border:0; border-radius:10px; padding:10px 16px; font:inherit; font-weight:600; cursor:pointer }
+  button:hover { filter:brightness(1.1) } button:disabled { opacity:.45; cursor:not-allowed }
+  button.ghost { background:var(--line) } button.danger { background:transparent; color:var(--red); border:1px solid var(--line) }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px } @media (max-width:720px){ .grid { grid-template-columns:1fr } }
+  #drop { border:2px dashed var(--line); border-radius:12px; padding:28px; text-align:center; color:var(--muted); cursor:pointer; transition:.2s }
+  #drop.over, #drop:hover { border-color:var(--green); color:var(--text) }
+  video, #srcImg { width:100%; max-height:260px; border-radius:10px; background:#000; margin-top:12px; display:none }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px }
+  input[type=range] { width:100%; accent-color:var(--green) }
+  select, input[type=text] { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px }
+  #crop { width:220px; height:220px; display:block; border-radius:10px; cursor:grab; touch-action:none;
+    background:repeating-conic-gradient(#2a3942 0 25%, #1c272e 0 50%) 0 0/20px 20px }
+  #crop:active { cursor:grabbing }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+  .chat { background:#0b141a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='1' fill='%23222e35'/%3E%3C/svg%3E"); border-radius:12px; min-height:240px; display:flex; flex-direction:column; align-items:flex-end; justify-content:flex-end; padding:16px }
+  .chat img { width:190px; height:190px; object-fit:contain; cursor:pointer }
+  .chat small { color:var(--muted) }
+  .empty { color:var(--muted); margin:auto }
+  #qrBox { display:none; text-align:center } #qrBox img { background:#fff; border-radius:12px; padding:8px; width:260px }
+  .muted { color:var(--muted); font-size:13px }
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); padding:12px 18px; border-radius:10px; background:var(--line); opacity:0; transition:.3s; pointer-events:none; max-width:90vw }
+  #toast.show { opacity:1 } #toast.err { background:#5c1f27 } #toast.good { background:#0d4b3a }
+  .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px }
+  .item { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:10px; font-size:12px }
+  .item img { width:100%; aspect-ratio:1; object-fit:contain }
+  .item .name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:13px }
+  .item .row { margin-top:8px; gap:6px } .item button { padding:6px 8px; font-size:12px; flex:1 }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid #fff6; border-top-color:#fff; border-radius:50%; animation:r 1s linear infinite; vertical-align:-2px }
+  @keyframes r { to { transform:rotate(360deg) } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sticker<span>Sound</span> Studio</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="pill" id="pill"><span class="dot"></span><span id="statusTxt">…</span></span>
+      <button id="connectBtn">Conectar WhatsApp</button>
+      <button id="logoutBtn" class="danger" style="display:none">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <div class="card" id="qrBox">
+    <h2>Escaneá el QR desde WhatsApp → Dispositivos vinculados → Vincular dispositivo</h2>
+    <img id="qrImg" alt="Código QR">
+    <p class="muted">El código se renueva solo cuando expira.</p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>1. Archivo</h2>
+      <div id="drop">Arrastrá un video, GIF o imagen acá<br><small>o hacé clic para elegir</small></div>
+      <input type="file" id="file" accept="video/*,image/*,.mkv,.avi" hidden>
+      <video id="vid" controls playsinline></video>
+      <img id="srcImg" alt="">
+
+      <div id="opts" style="display:none">
+        <label>Inicio: <b id="startTxt">0.0</b> s</label>
+        <input type="range" id="start" min="0" max="0" step="0.1" value="0">
+        <label>Duración: <b id="durTxt">5.0</b> s (máx. 10)</label>
+        <input type="range" id="dur" min="0.5" max="10" step="0.1" value="5">
+        <label>Volumen: <b id="volTxt">100</b>%</label>
+        <input type="range" id="vol" min="0" max="300" step="10" value="100">
+        <label>Encuadre</label>
+        <select id="fit"><option value="fill">Rellenar (ocupa todo el sticker)</option><option value="fit">Ajustar (fondo transparente)</option></select>
+        <div id="cropBox">
+          <label>Recorte del sticker <small>(arrastrá la imagen para moverla, rueda del mouse para zoom)</small></label>
+          <canvas id="crop" width="512" height="512"></canvas>
+          <div id="fillCtl">
+            <label>Zoom: <b id="zoomTxt">1.0</b>×</label>
+            <input type="range" id="zoom" min="1" max="4" step="0.05" value="1">
+            <label>Horizontal</label>
+            <input type="range" id="px" min="0" max="1" step="0.01" value="0.5">
+            <label>Vertical</label>
+            <input type="range" id="py" min="0" max="1" step="0.01" value="0.5">
+          </div>
+        </div>
+        <label>Reemplazar audio (opcional)</label>
+        <input type="file" id="audio" accept="audio/*,.ogg,.m4a">
+        <label>Nombre</label>
+        <input type="text" id="name" maxlength="60" placeholder="Mi sticker">
+        <div class="row">
+          <button id="sendBtn">Crear y enviar a mi WhatsApp</button>
+          <button id="makeBtn" class="ghost">Solo crear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. Vista previa</h2>
+      <div class="chat" id="chat"><span class="empty">El sticker aparece acá</span></div>
+      <audio id="player" controls style="width:100%;margin-top:10px;display:none"></audio>
+      <p class="muted" id="info"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px">
+      <h2 style="margin:0">Mis stickers</h2>
+      <input type="text" id="search" placeholder="Buscar…" style="max-width:200px">
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+
+  <p class="muted">⚠️ Usa Baileys, que no es una API oficial de Meta: existe riesgo de suspensión de la cuenta. Usalo solo con tu cuenta y sin envíos masivos. Todo se procesa en tu computadora.</p>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id)
+let file = null, stickers = []
+
+function toast(msg, kind = '') {
+  const t = $('toast'); t.textContent = msg; t.className = 'show ' + kind
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = '', 4500)
+}
+async function api(url, opts) {
+  const r = await fetch(url, opts); const j = await r.json()
+  if (!r.ok) throw new Error(j.error || 'Error'); return j
+}
+const kb = b => (b / 1024).toFixed(0) + ' KB'
+
+// ---- Conexión ----
+async function poll() {
+  try {
+    const s = await api('/api/status')
+    $('statusTxt').textContent = s.status === 'conectado' ? 'Conectado · +' + s.me.split('@')[0] : s.status
+    $('pill').className = 'pill ' + (s.status === 'conectado' ? 'ok' : s.status === 'desconectado' ? '' : 'wait')
+    $('connectBtn').style.display = s.status === 'desconectado' ? '' : 'none'
+    $('logoutBtn').style.display = s.status === 'desconectado' ? 'none' : ''
+    $('qrBox').style.display = s.qr ? 'block' : 'none'
+    if (s.qr) $('qrImg').src = s.qr
+    window.connected = s.status === 'conectado'
+  } catch { $('statusTxt').textContent = 'servidor apagado' }
+}
+setInterval(poll, 2000); poll()
+$('connectBtn').onclick = () => api('/api/connect', { method: 'POST' }).then(poll)
+$('logoutBtn').onclick = async () => { if (confirm('¿Cerrar sesión y borrar credenciales?')) { await api('/api/logout', { method: 'POST' }); poll() } }
+
+// ---- Archivo ----
+const drop = $('drop')
+drop.onclick = () => $('file').click()
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over') }
+drop.ondragleave = () => drop.classList.remove('over')
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) pick(e.dataTransfer.files[0]) }
+$('file').onchange = e => e.target.files[0] && pick(e.target.files[0])
+
+function pick(f) {
+  file = f
+  const url = URL.createObjectURL(f), isImg = f.type.startsWith('image/')
+  $('vid').style.display = isImg ? 'none' : 'block'
+  $('srcImg').style.display = isImg ? 'block' : 'none'
+  if (isImg) $('srcImg').src = url; else $('vid').src = url
+  $('name').value = f.name.replace(/\.[^.]+$/, '').slice(0, 60)
+  $('opts').style.display = 'block'
+  $('zoom').value = 1; $('px').value = $('py').value = 0.5; syncCtl()
+  drop.innerHTML = '📎 ' + f.name + '<br><small>clic para cambiar</small>'
+}
+$('vid').onloadedmetadata = () => {
+  const d = $('vid').duration || 0
+  $('start').max = Math.max(0, d - 0.5).toFixed(1); $('start').value = 0
+  $('dur').value = Math.min(10, d || 5).toFixed(1); upd()
+}
+function upd() {
+  $('startTxt').textContent = (+$('start').value).toFixed(1)
+  $('durTxt').textContent = (+$('dur').value).toFixed(1)
+  $('volTxt').textContent = $('vol').value
+}
+$('start').oninput = () => { upd(); $('vid').currentTime = +$('start').value }
+$('dur').oninput = $('vol').oninput = upd
+// Reproduce solo el tramo elegido
+$('vid').ontimeupdate = () => {
+  const v = $('vid'), s = +$('start').value, d = +$('dur').value
+  if (v.currentTime > s + d) v.currentTime = s
+}
+
+// ---- Recorte en vivo (misma cuenta que FFmpeg en media.js) ----
+const cv = $('crop'), ctx = cv.getContext('2d')
+function source() {
+  const img = $('srcImg'), v = $('vid')
+  if (img.style.display === 'block' && img.naturalWidth) return [img, img.naturalWidth, img.naturalHeight]
+  if (v.style.display === 'block' && v.videoWidth) return [v, v.videoWidth, v.videoHeight]
+}
+function draw() {
+  requestAnimationFrame(draw)
+  const s = source(); ctx.clearRect(0, 0, 512, 512); if (!s) return
+  const [el, w, h] = s
+  if ($('fit').value === 'fit') {
+    const k = Math.min(512 / w, 512 / h)
+    ctx.drawImage(el, (512 - w * k) / 2, (512 - h * k) / 2, w * k, h * k)
+  } else {
+    const k = Math.max(512 / w, 512 / h) * +$('zoom').value
+    const ox = (w * k - 512) * +$('px').value, oy = (h * k - 512) * +$('py').value
+    ctx.drawImage(el, -ox, -oy, w * k, h * k)
+  }
+}
+draw()
+function syncCtl() {
+  $('fillCtl').style.display = $('fit').value === 'fill' ? '' : 'none'
+  $('zoomTxt').textContent = (+$('zoom').value).toFixed(1)
+}
+$('fit').onchange = $('zoom').oninput = syncCtl; syncCtl()
+// Arrastrar para mover, rueda para zoom
+let dragging = null
+cv.onpointerdown = e => { if ($('fit').value === 'fill') { dragging = { x: e.clientX, y: e.clientY }; cv.setPointerCapture(e.pointerId) } }
+cv.onpointerup = () => dragging = null
+cv.onpointermove = e => {
+  const s = source(); if (!dragging || !s) return
+  const [, w, h] = s, k = Math.max(512 / w, 512 / h) * +$('zoom').value
+  const px = 512 / cv.clientWidth // pixeles de pantalla -> pixeles del sticker
+  const ex = w * k - 512, ey = h * k - 512
+  if (ex > 0) $('px').value = Math.min(1, Math.max(0, +$('px').value - (e.clientX - dragging.x) * px / ex))
+  if (ey > 0) $('py').value = Math.min(1, Math.max(0, +$('py').value - (e.clientY - dragging.y) * px / ey))
+  dragging = { x: e.clientX, y: e.clientY }
+}
+cv.onwheel = e => {
+  if ($('fit').value !== 'fill') return
+  e.preventDefault()
+  $('zoom').value = Math.min(4, Math.max(1, +$('zoom').value - Math.sign(e.deltaY) * 0.1)); syncCtl()
+}
+
+async function create(send) {
+  if (!file) return
+  if (send && !window.connected) return toast('Primero conectá WhatsApp', 'err')
+  const btn = send ? $('sendBtn') : $('makeBtn'), label = btn.textContent
+  $('sendBtn').disabled = $('makeBtn').disabled = true
+  btn.innerHTML = '<span class="spin"></span> ' + (send ? 'Creando y enviando…' : 'Creando…')
+  const fd = new FormData()
+  fd.append('media', file)
+  if ($('audio').files[0]) fd.append('audio', $('audio').files[0])
+  fd.append('start', $('start').value); fd.append('duration', $('dur').value)
+  fd.append('volume', $('vol').value / 100); fd.append('fit', $('fit').value)
+  fd.append('zoom', $('zoom').value); fd.append('x', $('px').value); fd.append('y', $('py').value)
+  fd.append('name', $('name').value); fd.append('send', send)
+  try {
+    const m = await api('/api/stickers', { method: 'POST', body: fd })
+    show(m)
+    toast(m.warning || (send ? '✅ Sticker enviado a tu chat' : '✅ Sticker creado'), m.warning ? '' : 'good')
+    load()
+  } catch (e) { toast(e.message, 'err') }
+  btn.textContent = label; $('sendBtn').disabled = $('makeBtn').disabled = false
+}
+$('sendBtn').onclick = () => create(true)
+$('makeBtn').onclick = () => create(false)
+
+function show(m) {
+  const t = Date.now()
+  $('chat').innerHTML = `<img src="/stickers/${m.id}.webp?${t}" title="Tocá para escuchar"><small>${new Date(m.created).toLocaleTimeString()} ✓✓</small>`
+  const p = $('player')
+  p.style.display = m.audio ? 'block' : 'none'
+  if (m.audio) p.src = `/stickers/${m.id}.ogg?${t}`
+  $('chat').querySelector('img').onclick = () => m.audio && (p.currentTime = 0, p.play())
+  $('info').textContent = `${m.duration.toFixed(1)} s · sticker ${kb(m.webpBytes)}` + (m.audio ? ` · audio ${kb(m.oggBytes)}` : ' · sin audio')
+}
+
+// ---- Historial ----
+async function load() { stickers = await api('/api/stickers'); render() }
+function render() {
+  const q = $('search').value.toLowerCase()
+  const items = stickers.filter(s => s.name.toLowerCase().includes(q))
+  $('list').innerHTML = items.length ? '' : '<p class="muted">Todavía no hay stickers.</p>'
+  for (const s of items) {
+    const el = document.createElement('div'); el.className = 'item'
+    el.innerHTML = `<img src="/stickers/${s.id}.webp"><div class="name"></div>
+      <div class="muted">${new Date(s.created).toLocaleString()}<br>${s.duration.toFixed(1)} s · ${kb(s.webpBytes + s.oggBytes)}${s.audio ? ' · 🔊' : ''}</div>
+      <div class="row"><button data-a="play" class="ghost" ${s.audio ? '' : 'disabled'}>▶</button><button data-a="send">Enviar</button></div>
+      <div class="row"><a href="/stickers/${s.id}.webp" download style="flex:1"><button class="ghost" style="width:100%">WebP</button></a>${s.audio ? `<a href="/stickers/${s.id}.ogg" download style="flex:1"><button class="ghost" style="width:100%">Audio</button></a>` : ''}<button data-a="del" class="danger">✕</button></div>`
+    el.querySelector('.name').textContent = s.name
+    el.onclick = async e => {
+      const a = e.target.dataset.a; if (!a) return
+      if (a === 'play') { const p = new Audio(`/stickers/${s.id}.ogg`); p.play() }
+      if (a === 'send') {
+        if (!window.connected) return toast('Primero conectá WhatsApp', 'err')
+        e.target.innerHTML = '<span class="spin"></span>'
+        try { await api(`/api/stickers/${s.id}/send`, { method: 'POST' }); toast('✅ Reenviado', 'good') } catch (err) { toast(err.message, 'err') }
+        e.target.textContent = 'Enviar'
+      }
+      if (a === 'del' && confirm('¿Eliminar este sticker?')) { await api(`/api/stickers/${s.id}`, { method: 'DELETE' }); load() }
+    }
+    $('list').appendChild(el)
+  }
+}
+$('search').oninput = render
+load()
+</script>
+</body>
+</html>
